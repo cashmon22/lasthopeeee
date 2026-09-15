@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import type { Request, RequestHandler } from "express";
 import type { User } from "@supabase/supabase-js";
 import { createAuthenticatedSupabaseClient, supabase } from "../lib/supabase";
-import { vendorDevices } from "../../shared/vendor-data";
+import { vendorDevices, type VendorDevice } from "../../shared/vendor-data";
 import type {
   CreatePaymentRequestInput,
   PaymentRequestStatus,
@@ -71,7 +71,33 @@ export const createPaymentRequest: RequestHandler = async (req, res) => {
     return;
   }
 
-  const device = vendorDevices.find((item) => item.id === body.deviceId);
+  const staticDevice = vendorDevices.find((item) => item.id === body.deviceId);
+  let device: Pick<VendorDevice, "id" | "name" | "model" | "price" | "currency"> | undefined = staticDevice;
+
+  if (!device) {
+    const { data: databaseDevice, error: databaseDeviceError } = await authenticatedSupabase
+      .from("devices")
+      .select("id,name,model,amount,status")
+      .eq("id", body.deviceId)
+      .eq("status", "Available")
+      .maybeSingle();
+
+    if (databaseDeviceError) {
+      res.status(500).json({ error: "Unable to verify the selected device." });
+      return;
+    }
+
+    if (databaseDevice) {
+      device = {
+        id: databaseDevice.id,
+        name: databaseDevice.name,
+        model: databaseDevice.model,
+        price: databaseDevice.amount,
+        currency: "USD",
+      };
+    }
+  }
+
   if (!device) {
     res.status(400).json({ error: "The selected device is not available." });
     return;

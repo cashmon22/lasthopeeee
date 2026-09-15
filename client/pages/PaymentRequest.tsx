@@ -22,7 +22,59 @@ import {
 } from "@/pages/TrustedVendor";
 import { vendorDevices, type VendorDevice } from "@shared/vendor-data";
 import type { PaymentRequest } from "@shared/payment-requests";
+import { supabase } from "@/lib/supabase";
 import { createPaymentRequest } from "@/lib/payment-requests";
+
+const neutralDevicePlaceholder = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400"><rect width="640" height="400" fill="#f1f4f6"/><rect x="190" y="105" width="260" height="160" rx="12" fill="#d8e0e7"/><rect x="208" y="123" width="224" height="112" rx="5" fill="#eef2f5"/><path d="M140 285h360l-28 22H168z" fill="#b6c2cc"/></svg>')}`;
+
+type DatabaseDevice = {
+  id: string;
+  name: string;
+  model: string;
+  specifications: string;
+  amount: number | null;
+  image_url: string | null;
+};
+
+function getDatabaseDeviceImage(imagePath: string | null) {
+  if (!imagePath) return neutralDevicePlaceholder;
+  if (/^https?:\/\//i.test(imagePath)) return imagePath;
+  return supabase.storage.from("device-images").getPublicUrl(imagePath).data.publicUrl || neutralDevicePlaceholder;
+}
+
+async function findDevice(deviceId: string) {
+  const staticDevice = vendorDevices.find((item) => item.id === deviceId);
+  if (staticDevice) return staticDevice;
+
+  const { data, error } = await supabase
+    .from("devices")
+    .select("id,name,model,specifications,amount,status,image_url")
+    .eq("id", deviceId)
+    .eq("status", "Available")
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const device = data as DatabaseDevice;
+  return {
+    id: device.id,
+    name: device.name,
+    model: device.model,
+    image: getDatabaseDeviceImage(device.image_url),
+    imageAlt: `${device.name} device`,
+    price: device.amount,
+    currency: "USD",
+    ram: "—",
+    storage: device.specifications,
+    processor: "—",
+    condition: "Admin inventory",
+    availability: "Available",
+    workDeviceStatus: "Amazon Work Device",
+    description: device.specifications,
+    features: [device.specifications],
+    category: "Laptop" as const,
+  } satisfies VendorDevice;
+}
 
 const initialForm = {
   fullLegalName: "",
@@ -245,8 +297,21 @@ export default function PaymentRequest() {
   const email = session?.user.email ?? "";
 
   useEffect(() => {
+    let isMounted = true;
     const deviceId = searchParams.get("deviceId");
-    setDevice(vendorDevices.find((item) => item.id === deviceId) ?? null);
+
+    if (!deviceId) {
+      setDevice(null);
+      return;
+    }
+
+    void findDevice(deviceId).then((selectedDevice) => {
+      if (isMounted) setDevice(selectedDevice);
+    });
+
+    return () => {
+      isMounted = false;
+    };
   }, [searchParams]);
 
   const amount = useMemo(() => (device ? formatPrice(device) : "—"), [device]);
