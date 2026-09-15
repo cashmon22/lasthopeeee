@@ -47,6 +47,17 @@ function requireText(value: unknown) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function logPaymentRequestFailure(stage: string, error: unknown) {
+  const details = error && typeof error === "object" ? error as Record<string, unknown> : {};
+  console.error("Payment request failed", {
+    stage,
+    message: typeof details.message === "string" ? details.message : "Unknown error",
+    code: typeof details.code === "string" ? details.code : undefined,
+    details: typeof details.details === "string" ? details.details : undefined,
+    hint: typeof details.hint === "string" ? details.hint : undefined,
+  });
+}
+
 export const createPaymentRequest: RequestHandler = async (req, res) => {
   const context = await getAuthenticatedUser(req, res);
   if (!context) return;
@@ -83,6 +94,7 @@ export const createPaymentRequest: RequestHandler = async (req, res) => {
       .maybeSingle();
 
     if (databaseDeviceError) {
+      logPaymentRequestFailure("device lookup", databaseDeviceError);
       res.status(500).json({ error: "Unable to verify the selected device." });
       return;
     }
@@ -130,6 +142,7 @@ export const createPaymentRequest: RequestHandler = async (req, res) => {
     .single();
 
   if (error) {
+    logPaymentRequestFailure("payment request insert", error);
     res.status(500).json({ error: "Unable to save the payment request." });
     return;
   }
