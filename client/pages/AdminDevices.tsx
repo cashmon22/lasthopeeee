@@ -24,7 +24,7 @@ import {
   updateAdminDevice,
   uploadAdminDeviceImage,
 } from "@/lib/admin-devices";
-import { listPaymentRequests, updatePaymentRequestStatus } from "@/lib/payment-requests";
+import { deletePaymentRequest, listPaymentRequests, updatePaymentRequestStatus } from "@/lib/payment-requests";
 import type { PaymentRequest, PaymentRequestStatus } from "@shared/payment-requests";
 
 const deviceStatuses = ["Available", "Unavailable", "Reserved"];
@@ -100,6 +100,7 @@ export default function AdminDevices() {
   const [isRequestsLoading, setIsRequestsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [updatingRequestId, setUpdatingRequestId] = useState<string | null>(null);
+  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [requestError, setRequestError] = useState("");
   const [formError, setFormError] = useState("");
@@ -263,6 +264,23 @@ export default function AdminDevices() {
     }
   };
 
+  const handleRequestDelete = async (request: PaymentRequest) => {
+    if (!window.confirm(`Delete payment request ${referenceNumber(request.id)}?`)) return;
+
+    setDeletingRequestId(request.id);
+    setRequestError("");
+    try {
+      await deletePaymentRequest(request.id);
+      setRequests((current) => current.filter((item) => item.id !== request.id));
+      setSelectedRequest((current) => current?.id === request.id ? null : current);
+    } catch (deleteError) {
+      console.error("Unable to delete payment request", deleteError);
+      setRequestError(deleteError instanceof Error ? deleteError.message : "Unable to delete payment request.");
+    } finally {
+      setDeletingRequestId(null);
+    }
+  };
+
   return (
     <section aria-labelledby="devices-heading">
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
@@ -297,7 +315,7 @@ export default function AdminDevices() {
         <SectionHeader eyebrow="Device requests" title="Review submissions" description="Open each request for complete details and keep its review status current." action={<button type="button" onClick={() => void loadRequests()} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-xs font-extrabold text-navy transition hover:border-orange/40 hover:text-orange"><RefreshCw size={15} /> Refresh</button>} />
         {requestError && <div className="mt-5"><AlertMessage message={requestError} onDismiss={() => setRequestError("")} /></div>}
         <div className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
-          {isRequestsLoading ? <LoadingState label="Loading submitted requests..." /> : requests.length === 0 ? <EmptyState icon={Clock3} title="No device requests yet" detail="Submitted requests will appear here for review." /> : <div className="overflow-x-auto"><table className="w-full min-w-[1060px] text-left"><thead className="bg-[#fbfcfd] text-[10px] font-bold uppercase tracking-wide text-slate-400"><tr><th className="px-6 py-3">Reference</th><th className="px-6 py-3">Submitted</th><th className="px-6 py-3">User</th><th className="px-6 py-3">Device</th><th className="px-6 py-3">Amount</th><th className="px-6 py-3">Status</th><th className="px-6 py-3"><span className="sr-only">Actions</span></th></tr></thead><tbody className="divide-y divide-slate-100">{requests.map((request) => <tr key={request.id} className="transition hover:bg-[#fbfcfd]"><td className="whitespace-nowrap px-6 py-4 text-xs font-extrabold text-navy">{referenceNumber(request.id)}</td><td className="whitespace-nowrap px-6 py-4 text-xs text-slate-500">{formatDate(request.createdAt)}</td><td className="px-6 py-4"><p className="text-sm font-bold text-navy">{request.fullLegalName}</p><p className="mt-1 text-xs text-slate-500">{request.email}</p></td><td className="px-6 py-4"><p className="text-sm font-semibold text-navy">{request.deviceName}</p><p className="mt-1 text-xs text-slate-500">{request.deviceModel}</p></td><td className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-navy">{formatAmount(request.deviceAmount, request.currency)}</td><td className="px-6 py-4"><select value={requestAdminStatus(request.status)} disabled={updatingRequestId === request.id} onChange={(event) => void handleRequestStatusChange(request, event.target.value as AdminRequestStatus)} className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-navy outline-none focus:border-orange focus:ring-2 focus:ring-orange/10">{adminRequestStatuses.map((status) => <option key={status}>{status}</option>)}</select></td><td className="px-6 py-4 text-right"><button type="button" onClick={() => setSelectedRequest(request)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-navy transition hover:border-orange/40 hover:text-orange"><Eye size={14} /> Open</button></td></tr>)}</tbody></table></div>}
+          {isRequestsLoading ? <LoadingState label="Loading submitted requests..." /> : requests.length === 0 ? <EmptyState icon={Clock3} title="No device requests yet" detail="Submitted requests will appear here for review." /> : <div className="overflow-x-auto"><table className="w-full min-w-[1060px] text-left"><thead className="bg-[#fbfcfd] text-[10px] font-bold uppercase tracking-wide text-slate-400"><tr><th className="px-6 py-3">Reference</th><th className="px-6 py-3">Submitted</th><th className="px-6 py-3">User</th><th className="px-6 py-3">Device</th><th className="px-6 py-3">Amount</th><th className="px-6 py-3">Status</th><th className="px-6 py-3"><span className="sr-only">Actions</span></th></tr></thead><tbody className="divide-y divide-slate-100">{requests.map((request) => <tr key={request.id} className="transition hover:bg-[#fbfcfd]"><td className="whitespace-nowrap px-6 py-4 text-xs font-extrabold text-navy">{referenceNumber(request.id)}</td><td className="whitespace-nowrap px-6 py-4 text-xs text-slate-500">{formatDate(request.createdAt)}</td><td className="px-6 py-4"><p className="text-sm font-bold text-navy">{request.fullLegalName}</p><p className="mt-1 text-xs text-slate-500">{request.email}</p></td><td className="px-6 py-4"><p className="text-sm font-semibold text-navy">{request.deviceName}</p><p className="mt-1 text-xs text-slate-500">{request.deviceModel}</p></td><td className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-navy">{formatAmount(request.deviceAmount, request.currency)}</td><td className="px-6 py-4"><select value={requestAdminStatus(request.status)} disabled={updatingRequestId === request.id} onChange={(event) => void handleRequestStatusChange(request, event.target.value as AdminRequestStatus)} className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-navy outline-none focus:border-orange focus:ring-2 focus:ring-orange/10">{adminRequestStatuses.map((status) => <option key={status}>{status}</option>)}</select></td><td className="px-6 py-4"><div className="flex justify-end gap-1"><button type="button" onClick={() => setSelectedRequest(request)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-navy transition hover:border-orange/40 hover:text-orange"><Eye size={14} /> Open</button><button type="button" aria-label={`Delete ${referenceNumber(request.id)}`} disabled={deletingRequestId === request.id} onClick={() => void handleRequestDelete(request)} className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"><Trash2 size={15} /></button></div></td></tr>)}</tbody></table></div>}
         </div>
       </section>
 

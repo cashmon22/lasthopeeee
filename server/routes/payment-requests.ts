@@ -230,4 +230,29 @@ export const updatePaymentRequestStatus: RequestHandler = async (req, res) => {
   res.json(data);
 };
 
+export const deletePaymentRequest: RequestHandler = async (req, res) => {
+  const context = await getAuthenticatedUser(req, res);
+  if (!context) return;
+  const { user, supabase: authenticatedSupabase } = context;
+  if (!isAdmin(user)) {
+    res.status(403).json({ error: "Administrator access required" });
+    return;
+  }
+
+  const { data, error } = await authenticatedSupabase
+    .from("payment_requests")
+    .delete()
+    .eq("id", req.params.id)
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("Unable to delete payment request", error);
+    res.status(500).json({ error: "Unable to delete payment request." });
+    return;
+  }
+
+  res.json(data);
+};
+
 export type { AuthenticatedRequest };

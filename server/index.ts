@@ -4,6 +4,7 @@ import cors from "cors";
 import { handleProgramStatus } from "./routes/program";
 import {
   createPaymentRequest,
+  deletePaymentRequest,
   listPaymentRequests,
   updatePaymentRequestStatus,
 } from "./routes/payment-requests";
@@ -43,6 +44,7 @@ export function createServer() {
     "/api/admin/payment-requests/:id/status",
     updatePaymentRequestStatus,
   );
+  app.delete("/api/admin/payment-requests/:id", deletePaymentRequest);
   app.get("/api/admin/users", listAdminUsers);
   app.get("/api/admin/users/:id", getAdminUserDetails);
   app.patch("/api/admin/users/:id/status", updateAdminUserStatus);
