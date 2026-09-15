@@ -37,3 +37,9 @@ export function updatePaymentRequestStatus(id: string, status: PaymentRequestSta
     body: JSON.stringify({ status }),
   });
 }
+
+export function deletePaymentRequest(id: string) {
+  return request<{ id: string }>(`/api/admin/payment-requests/${id}`, {
+    method: "DELETE",
+  });
+}
